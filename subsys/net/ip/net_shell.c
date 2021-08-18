@@ -1178,6 +1178,7 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
 {
 	struct net_shell_user_data *data = user_data;
 	const struct shell *shell = data->shell;
+	extern uint32_t dbg0_sys_rand32_stat(int cnt_id);
 
 	if (iface) {
 		const char *extra;
@@ -1275,6 +1276,9 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
 
 	PR("Bytes received %u\n", GET_STAT(iface, bytes.received));
 	PR("Bytes sent     %u\n", GET_STAT(iface, bytes.sent));
+	PR("sys_rand32_get %u\t(%u)\n",
+	   dbg0_sys_rand32_stat(0),
+	   dbg0_sys_rand32_stat(1));
 	PR("Processing err %d\n", GET_STAT(iface, processing_error));
 
 	print_tc_tx_stats(shell, iface);
@@ -6055,5 +6059,11 @@ int net_shell_init(void)
 	(void)cmd_net_events_on(shell_backend_uart_get_ptr(), 1, argv);
 #endif
 
+	return 0;
+}
+
+__WEAK uint32_t dbg0_sys_rand32_stat(int cnt_id)
+{
+	(void)cnt_id;
 	return 0;
 }
