@@ -41,6 +41,9 @@ LOG_MODULE_REGISTER(net_ctx, CONFIG_NET_CONTEXT_LOG_LEVEL);
 #include "tcp2.h"
 #endif
 
+static inline void dbg0z_net_send(int cntr_id);
+static inline void dbg0e_net_send(int cntr_id);
+
 #ifndef EPFNOSUPPORT
 /* Some old versions of newlib haven't got this defined in errno.h,
  * Just use EPROTONOSUPPORT in this case
@@ -1663,11 +1666,12 @@ static int context_sendto(struct net_context *context,
 		ret = context_setup_udp_packet(context, pkt, buf, len, msghdr,
 					       dst_addr, addrlen);
 		if (ret < 0) {
+            dbg0e_net_send(2);
 			goto fail;
 		}
 
 		context_finalize_packet(context, pkt);
-
+        dbg0z_net_send(3);
 		ret = net_send_data(pkt);
 	} else if (IS_ENABLED(CONFIG_NET_TCP) &&
 		   net_context_get_ip_proto(context) == IPPROTO_TCP) {
@@ -2312,4 +2316,17 @@ const char *net_context_state(struct net_context *context)
 void net_context_init(void)
 {
 	k_sem_init(&contexts_lock, 1, K_SEM_MAX_LIMIT);
+}
+
+extern volatile uint32_t dbg0z_req_net_send[];
+extern volatile uint32_t dbg0z_err_net_send[];
+
+static inline void dbg0z_net_send(int cntr_id)
+{
+    dbg0z_req_net_send[cntr_id] += 1;
+}
+
+static inline void dbg0e_net_send(int cntr_id)
+{
+    dbg0z_err_net_send[cntr_id] += 1;
 }

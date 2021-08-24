@@ -29,6 +29,9 @@ LOG_MODULE_REGISTER(net_sock, CONFIG_NET_SOCKETS_LOG_LEVEL);
 
 #include "sockets_internal.h"
 
+static inline void dbg0z_net_send(int cntr_id);
+static inline void dbg0e_net_send(int cntr_id);
+
 #define SET_ERRNO(x) \
 	{ int _err = x; if (_err < 0) { errno = -_err; return -1; } }
 
@@ -617,7 +620,7 @@ ssize_t zsock_sendto_ctx(struct net_context *ctx, const void *buf, size_t len,
 	k_timeout_t timeout = K_FOREVER;
 	uint64_t buf_timeout = 0;
 	int status;
-
+    dbg0z_net_send(2);
 	if ((flags & ZSOCK_MSG_DONTWAIT) || sock_is_nonblock(ctx)) {
 		timeout = K_NO_WAIT;
 	} else {
@@ -646,6 +649,7 @@ ssize_t zsock_sendto_ctx(struct net_context *ctx, const void *buf, size_t len,
 		}
 
 		if (status < 0) {
+            dbg0e_net_send(1);
 			if (((status == -ENOBUFS) || (status == -EAGAIN)) &&
 			    K_TIMEOUT_EQ(timeout, K_FOREVER)) {
 				/* If we cannot get any buffers in reasonable
@@ -2195,3 +2199,16 @@ const struct socket_op_vtable sock_fd_op_vtable = {
 	.setsockopt = sock_setsockopt_vmeth,
 	.getsockname = sock_getsockname_vmeth,
 };
+
+volatile uint32_t dbg0z_req_net_send[10];
+volatile uint32_t dbg0z_err_net_send[10];
+
+static inline void dbg0z_net_send(int cntr_id)
+{
+    dbg0z_req_net_send[cntr_id] += 1;
+}
+
+static inline void dbg0e_net_send(int cntr_id)
+{
+    dbg0z_err_net_send[cntr_id] += 1;
+}

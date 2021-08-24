@@ -27,6 +27,9 @@ LOG_MODULE_REGISTER(net_if, CONFIG_NET_IF_LOG_LEVEL);
 
 #include "net_stats.h"
 
+static inline void dbg0z_net_send(int cntr_id);
+static inline void dbg0e_net_send(int cntr_id);
+
 #define REACHABLE_TIME (MSEC_PER_SEC * 30) /* in ms */
 /*
  * split the min/max random reachable factors into numerator/denominator
@@ -256,7 +259,7 @@ static bool net_if_tx(struct net_if *iface, struct net_pkt *pkt)
 				net_pkt_ref(pkt);
 			}
 		}
-
+        dbg0z_net_send(8);
 		status = net_if_l2(iface)->send(iface, pkt);
 
 		if (IS_ENABLED(CONFIG_NET_PKT_TXTIME_STATS)) {
@@ -335,7 +338,7 @@ void net_if_queue_tx(struct net_if *iface, struct net_pkt *pkt)
 {
 	uint8_t prio = net_pkt_priority(pkt);
 	uint8_t tc = net_tx_priority2tc(prio);
-
+    dbg0z_net_send(6);
 	net_stats_update_tc_sent_pkt(iface, tc);
 	net_stats_update_tc_sent_bytes(iface, tc, net_pkt_get_len(pkt));
 	net_stats_update_tc_sent_priority(iface, tc, prio);
@@ -347,7 +350,7 @@ void net_if_queue_tx(struct net_if *iface, struct net_pkt *pkt)
 	if ((IS_ENABLED(CONFIG_NET_TC_SKIP_FOR_HIGH_PRIO) &&
 	     prio == NET_PRIORITY_CA) || NET_TC_TX_COUNT == 0) {
 		net_pkt_set_tx_stats_tick(pkt, k_cycle_get_32());
-
+        dbg0z_net_send(7);
 		net_if_tx(net_pkt_iface(pkt), pkt);
 		return;
 	}
@@ -430,7 +433,7 @@ enum net_verdict net_if_send_data(struct net_if *iface, struct net_pkt *pkt)
 	struct net_linkaddr *dst = net_pkt_lladdr_dst(pkt);
 	enum net_verdict verdict = NET_OK;
 	int status = -EIO;
-
+    dbg0z_net_send(4);
 	k_mutex_lock(&lock, K_FOREVER);
 
 	if (!net_if_flag_is_set(iface, NET_IF_UP) ||
@@ -499,6 +502,7 @@ done:
 		}
 	} else if (verdict == NET_OK) {
 		/* Packet is ready to be sent by L2, let's queue */
+        dbg0z_net_send(5);
 		net_if_queue_tx(iface, pkt);
 	}
 
@@ -4326,4 +4330,17 @@ void net_if_post_init(void)
 			net_if_up(iface);
 		}
 	}
+}
+
+extern volatile uint32_t dbg0z_req_net_send[];
+extern volatile uint32_t dbg0z_err_net_send[];
+
+static inline void dbg0z_net_send(int cntr_id)
+{
+    dbg0z_req_net_send[cntr_id] += 1;
+}
+
+static inline void dbg0e_net_send(int cntr_id)
+{
+    dbg0z_err_net_send[cntr_id] += 1;
 }

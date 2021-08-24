@@ -21,6 +21,9 @@ LOG_MODULE_DECLARE(net_echo_client_sample, LOG_LEVEL_DBG);
 #include "common.h"
 #include "ca_certificate.h"
 
+static inline void dbg0z_net_send(int cntr_id);
+static inline void dbg0e_net_send(int cntr_id);
+
 #define RECV_BUF_SIZE 1280
 #define UDP_SLEEP K_MSEC(150)
 #define UDP_WAIT K_SECONDS(10)
@@ -30,6 +33,10 @@ static APP_BMEM char recv_buf[RECV_BUF_SIZE];
 static int send_udp_data(struct data *data)
 {
 	int ret;
+    uint32_t dbg0_udp_tx_start;
+    extern volatile uint64_t dbg0_udp_tx_time_sum;
+    dbg0z_net_send(0);
+    dbg0_udp_tx_start = k_cycle_get_32();
 
 	do {
 		data->udp.expecting = sys_rand32_get() % ipsum_len;
@@ -37,6 +44,10 @@ static int send_udp_data(struct data *data)
 		 data->udp.expecting > data->udp.mtu);
 
 	ret = send(data->udp.sock, lorem_ipsum, data->udp.expecting, 0);
+    __DMB();
+    dbg0_udp_tx_time_sum += (uint64_t)(k_cycle_get_32() - dbg0_udp_tx_start);
+    __DMB();
+    dbg0z_net_send(1);
 
 	LOG_DBG("%s UDP: Sent %d bytes", data->proto, data->udp.expecting);
 
@@ -65,6 +76,7 @@ static void wait_reply(struct k_work *work)
 	/* This means that we did not receive response in time. */
 	struct data *data = CONTAINER_OF(work, struct data, udp.recv);
 
+    dbg0e_net_send(0);
 	LOG_ERR("UDP %s: Data packet not received", data->proto);
 
 	/* Send a new packet at this point */
@@ -267,4 +279,17 @@ void stop_udp(void)
 			(void)close(conf.ipv4.udp.sock);
 		}
 	}
+}
+
+extern volatile uint32_t dbg0z_req_net_send[];
+extern volatile uint32_t dbg0z_err_net_send[];
+
+static inline void dbg0z_net_send(int cntr_id)
+{
+    dbg0z_req_net_send[cntr_id] += 1;
+}
+
+static inline void dbg0e_net_send(int cntr_id)
+{
+    dbg0z_err_net_send[cntr_id] += 1;
 }

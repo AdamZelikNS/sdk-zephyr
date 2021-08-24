@@ -30,6 +30,8 @@ LOG_MODULE_REGISTER(net_echo_server_sample, LOG_LEVEL_DBG);
 static struct k_sem quit_lock;
 static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
+volatile uint32_t dbg0_net_connect_cnt = 0;
+volatile uint32_t dbg0_net_disconnect_cnt = 0;
 K_SEM_DEFINE(run_app, 0, 1);
 static bool want_to_quit;
 
@@ -101,7 +103,7 @@ static void event_handler(struct net_mgmt_event_callback *cb,
 	if (mgmt_event == NET_EVENT_L4_CONNECTED) {
 		LOG_INF("Network connected");
 
-		connected = true;
+		connected = true; dbg0_net_connect_cnt += 1;
 		k_sem_give(&run_app);
 
 		return;
@@ -112,7 +114,7 @@ static void event_handler(struct net_mgmt_event_callback *cb,
 			LOG_INF("Waiting network to be connected");
 		} else {
 			LOG_INF("Network disconnected");
-			connected = false;
+			connected = false; dbg0_net_disconnect_cnt += 1;
 		}
 
 		k_sem_reset(&run_app);
@@ -244,4 +246,16 @@ void main(void)
 	if (connected) {
 		stop_udp_and_tcp();
 	}
+}
+
+uint32_t dbg0_net_get_conn_cnt(int counter_id)
+{
+    if (counter_id == 1)
+    {
+        return dbg0_net_connect_cnt;
+    }
+    else if (counter_id == 2)
+    {
+        return dbg0_net_disconnect_cnt;
+    }
 }

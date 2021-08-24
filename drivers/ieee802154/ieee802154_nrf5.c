@@ -515,6 +515,8 @@ static int nrf5_tx(const struct device *dev,
 		   struct net_buf *frag)
 {
 	struct nrf5_802154_data *nrf5_radio = NRF5_802154_DATA(dev);
+    uint32_t dbg0_nrf5tx_start;
+    extern volatile uint64_t dbg0_nrf5tx_time_sum;
 	uint8_t payload_len = frag->len;
 	uint8_t *payload = frag->data;
 	bool ret = true;
@@ -524,6 +526,7 @@ static int nrf5_tx(const struct device *dev,
 	nrf5_radio->tx_psdu[0] = payload_len + NRF5_FCS_LENGTH;
 	memcpy(nrf5_radio->tx_psdu + 1, payload, payload_len);
 
+    dbg0_nrf5tx_start = k_cycle_get_32();
 	/* Reset semaphore in case ACK was received after timeout */
 	k_sem_reset(&nrf5_radio->tx_wait);
 
@@ -563,6 +566,9 @@ static int nrf5_tx(const struct device *dev,
 
 	/* Wait for the callback from the radio driver. */
 	k_sem_take(&nrf5_radio->tx_wait, K_FOREVER);
+    __DMB();
+    dbg0_nrf5tx_time_sum += (uint64_t)(k_cycle_get_32() - dbg0_nrf5tx_start);
+    __DMB();
 
 	LOG_DBG("Result: %d", nrf5_data.tx_result);
 
@@ -1115,3 +1121,5 @@ DEVICE_DEFINE(nrf5_154_radio, CONFIG_IEEE802154_NRF5_DRV_NAME,
 		POST_KERNEL, CONFIG_IEEE802154_NRF5_INIT_PRIO,
 		&nrf5_radio_api);
 #endif
+
+volatile uint64_t dbg0_nrf5tx_time_sum = 0;

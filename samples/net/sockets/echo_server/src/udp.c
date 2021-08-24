@@ -23,6 +23,9 @@ LOG_MODULE_DECLARE(net_echo_server_sample, LOG_LEVEL_DBG);
 static void process_udp4(void);
 static void process_udp6(void);
 
+static inline void dbg0z_net_send(int cntr_id);
+static inline void dbg0e_net_send(int cntr_id);
+
 K_THREAD_DEFINE(udp4_thread_id, STACK_SIZE,
 		process_udp4, NULL, NULL, NULL,
 		THREAD_PRIORITY,
@@ -113,6 +116,7 @@ static int process_udp(struct data *data)
 			atomic_add(&data->udp.bytes_received, received);
 		}
 
+        dbg0z_net_send(0);
 		ret = sendto(data->udp.sock, data->udp.recv_buffer, received, 0,
 			     &client_addr, client_addr_len);
 		if (ret < 0) {
@@ -247,4 +251,17 @@ void stop_udp(void)
 			(void)close(conf.ipv4.udp.sock);
 		}
 	}
+}
+
+extern volatile uint32_t dbg0z_req_net_send[];
+extern volatile uint32_t dbg0z_err_net_send[];
+
+static inline void dbg0z_net_send(int cntr_id)
+{
+    dbg0z_req_net_send[cntr_id] += 1;
+}
+
+static inline void dbg0e_net_send(int cntr_id)
+{
+    dbg0z_err_net_send[cntr_id] += 1;
 }

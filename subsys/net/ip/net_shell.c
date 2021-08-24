@@ -81,6 +81,12 @@ LOG_MODULE_REGISTER(net_shell, LOG_LEVEL_DBG);
 #include <sys/fdtable.h>
 #include "websocket/websocket_internal.h"
 
+#include <nrf_802154.h>
+static void nrf_802154_stat_counters_diff_get(nrf_802154_stat_counters_t * p_sc_diff);
+static void nrf_802154_stat_totals_diff_get(nrf_802154_stat_totals_t * p_st_diff);
+extern uint32_t dbg0_net_get_conn_cnt(int counter_id);
+volatile uint64_t dbg0_udp_tx_time_sum = 0;
+
 #define PR(fmt, ...)						\
 	shell_fprintf(shell, SHELL_NORMAL, fmt, ##__VA_ARGS__)
 
@@ -1179,6 +1185,16 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
 	struct net_shell_user_data *data = user_data;
 	const struct shell *shell = data->shell;
 	extern uint32_t dbg0_sys_rand32_stat(int cnt_id);
+    extern volatile uint32_t dbg0z_req_net_send[];
+    extern volatile uint32_t dbg0z_err_net_send[];
+    uint32_t * const p_req_net_send = (uint32_t *)&(dbg0z_req_net_send[0]);
+    uint32_t * const p_err_net_send = (uint32_t *)&(dbg0z_err_net_send[0]);
+    extern volatile uint64_t dbg0_nrf5tx_time_sum;
+
+    nrf_802154_stat_counters_t d154_sc;
+    nrf_802154_stat_totals_t d154_st;
+    nrf_802154_stat_counters_diff_get(&d154_sc);
+    nrf_802154_stat_totals_diff_get(&d154_st);
 
 	if (iface) {
 		const char *extra;
@@ -1190,6 +1206,10 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
 		PR("\nGlobal statistics\n");
 		PR("=================\n");
 	}
+
+	PR("Net CONNECT    %u (%u)\n",
+	   dbg0_net_get_conn_cnt(1),
+	   dbg0_net_get_conn_cnt(2));
 
 #if defined(CONFIG_NET_STATISTICS_IPV6) && defined(CONFIG_NET_NATIVE_IPV6)
 	PR("IPv6 recv      %d\tsent\t%d\tdrop\t%d\tforwarded\t%d\n",
@@ -1276,9 +1296,49 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
 
 	PR("Bytes received %u\n", GET_STAT(iface, bytes.received));
 	PR("Bytes sent     %u\n", GET_STAT(iface, bytes.sent));
-	PR("sys_rand32_get %u\t(%u)\n",
-	   dbg0_sys_rand32_stat(0),
-	   dbg0_sys_rand32_stat(1));
+	PR("dbg NET send   %u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+       p_req_net_send[0], // echo-client: send(data->udp.sock, ..)
+       p_req_net_send[1],
+       p_req_net_send[2], // subsys/net/lib/sockets: zsock_sendto_ctx()
+       p_req_net_send[3],
+       p_req_net_send[4],
+       p_req_net_send[5], // subsys/net/ip/net_if: ..
+       p_req_net_send[6], // subsys/net/ip/net_if: net_if_queue_tx
+       p_req_net_send[7], // subsys/net/ip/net_if: ..
+       p_req_net_send[8], // subsys/net/ip/net_if: net_if_l2(iface)->send(iface, pkt);
+       p_req_net_send[9]);
+	PR("dbg NET sErr   %u,%u,%u\n",
+       p_err_net_send[0], // echo-client: udp timeout
+       p_err_net_send[1],
+       p_err_net_send[2],
+       p_req_net_send[3]);
+	PR("d154_rx_time   %llu\t(%llu)\n",
+       d154_st.total_listening_time,
+       d154_st.total_receive_time);
+	PR("d154_rx_fr     %u\t(%u)\n",
+       d154_sc.received_frames,
+       d154_sc.received_preambles);
+    // k_cycle_get_32: (nrf_802154_transmit_csma_ca - nrf_802154_transmitted)
+	PR("nrf5_tx_time   %llu\t\t%llu\n", dbg0_nrf5tx_time_sum, dbg0_udp_tx_time_sum); // ieee802154-shimm    echo-client-udp
+	PR("d154_tx_fr     %u\t(%u,%u,%u)\n",
+       d154_sc.tx_csma_ca_start,      // void nrf_802154_transmit_csma_ca_raw(const uint8_t * p_data);
+       d154_sc.tx_starded,            // nrf_802154_core_transmit() --> tx_init()
+       d154_sc.tx0_ok,                // void nrf_802154_trx_transmit_frame_started(void)
+       d154_sc.tx1_ok);               // void nrf_802154_trx_transmit_frame_transmitted(void)
+	PR("d154_cca_faild %u\n",
+       d154_sc.cca_failed_attempts);  // static void irq_handler_ccabusy(void)
+	PR("d154_tx_failed %u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+       (d154_sc.csma_ca_aborted),            // nrf_802154_csma_ca_abort()->procedure_stop()
+       (d154_sc.csma_ca_fail_hook),          // nrf_802154_csma_ca_tx_failed_hook()
+       (d154_sc.csma_ca_fail_busy_channel),  // csma_ca --> nrf_802154_notify_transmit_failed(TX_ERROR_BUSY_CHANNEL);
+       (d154_sc.tx_fail_busy_channel),       // NRF_802154_TX_ERROR_.. :0x01: cca reported busy channel before the transmission.
+       (d154_sc.tx_fail_invalid_ack),        // NRF_802154_TX_ERROR_.. :0x02: received ack frame is other than expected.
+       (d154_sc.tx_fail_no_mem),
+       (d154_sc.tx_fail_timeslot_ended),
+       (d154_sc.tx_fail_no_ack),
+       (d154_sc.tx_fail_aborted),
+       (d154_sc.tx_fail_timeslot_denied),
+       (d154_sc.tx_fail_timeout));
 	PR("Processing err %d\n", GET_STAT(iface, processing_error));
 
 	print_tc_tx_stats(shell, iface);
@@ -1313,6 +1373,15 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
 #endif /* CONFIG_NET_STATISTICS_PPP && CONFIG_NET_STATISTICS_USER_API */
 
 	print_net_pm_stats(shell, iface);
+
+    for (int dbg0i = 0; dbg0i < 10; dbg0i ++)
+    {
+      dbg0z_req_net_send[dbg0i] = 0;
+      dbg0z_err_net_send[dbg0i] = 0;
+    }
+
+    dbg0_nrf5tx_time_sum = 0uLL;
+    dbg0_udp_tx_time_sum = 0uLL;
 }
 #endif /* CONFIG_NET_STATISTICS */
 
@@ -6065,5 +6134,64 @@ int net_shell_init(void)
 __WEAK uint32_t dbg0_sys_rand32_stat(int cnt_id)
 {
 	(void)cnt_id;
+	return 0;
+}
+
+static void nrf_802154_stat_counters_diff_get(nrf_802154_stat_counters_t * p_sc_diff)
+{
+#if 0
+    nrf_802154_stat_counters_get(p_sc_diff);
+#elif 1
+    static nrf_802154_stat_counters_t dbg_802154_stat_cntrs =
+    { 0, 0, 0, 0, 0, 0, 0, 0 };
+    nrf_802154_stat_counters_t d154_stats_now;
+    uint32_t * p_now;
+    uint32_t * p_prv;
+    uint32_t * p_diff;
+
+    nrf_802154_stat_counters_get(&d154_stats_now);
+
+    p_now  = (uint32_t *)&d154_stats_now;
+    p_prv  = (uint32_t *)&dbg_802154_stat_cntrs;
+    p_diff = (uint32_t *)p_sc_diff;
+
+    for (int i = 0; i < (sizeof(nrf_802154_stat_counters_t) / sizeof(uint32_t)); i ++)
+    {
+        *(p_diff ++) = ((*(p_now ++)) - (*(p_prv ++)));
+    }
+
+    dbg_802154_stat_cntrs = d154_stats_now;
+#endif
+}
+
+static void nrf_802154_stat_totals_diff_get(nrf_802154_stat_totals_t * p_st_diff)
+{
+#if 0
+    nrf_802154_stat_totals_get(p_st_diff);
+#elif 1
+    static nrf_802154_stat_totals_t dbg_802154_stat_totals = { 0, 0, 0 };
+    nrf_802154_stat_totals_t d154_st_now;
+    uint64_t * p_now;
+    uint64_t * p_prv;
+    uint64_t * p_diff;
+
+    nrf_802154_stat_totals_get(&d154_st_now);
+
+    p_now  = (uint64_t *)&d154_st_now;
+    p_prv  = (uint64_t *)&dbg_802154_stat_totals;
+    p_diff = (uint64_t *)p_st_diff;
+
+    for (int i = 0; i < (sizeof(nrf_802154_stat_totals_t) / sizeof(uint64_t)); i ++)
+    {
+        *(p_diff ++) = ((*(p_now ++)) - (*(p_prv ++)));
+    }
+
+    dbg_802154_stat_totals = d154_st_now;
+#endif
+}
+
+__WEAK uint32_t dbg0_net_get_conn_cnt(int counter_id)
+{
+	(void)counter_id;
 	return 0;
 }

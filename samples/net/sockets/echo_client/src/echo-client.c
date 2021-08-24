@@ -91,6 +91,8 @@ static APP_BMEM struct pollfd fds[4];
 static APP_BMEM int nfds;
 
 static APP_BMEM bool connected;
+volatile uint32_t dbg0_net_connect_cnt = 0;
+volatile uint32_t dbg0_net_disconnect_cnt = 0;
 K_SEM_DEFINE(run_app, 0, 1);
 
 static struct net_mgmt_event_callback mgmt_cb;
@@ -203,7 +205,7 @@ static void event_handler(struct net_mgmt_event_callback *cb,
 	if (mgmt_event == NET_EVENT_L4_CONNECTED) {
 		LOG_INF("Network connected");
 
-		connected = true;
+		connected = true; dbg0_net_connect_cnt += 1;
 		conf.ipv4.udp.mtu = net_if_get_mtu(iface);
 		conf.ipv6.udp.mtu = conf.ipv4.udp.mtu;
 		k_sem_give(&run_app);
@@ -214,7 +216,7 @@ static void event_handler(struct net_mgmt_event_callback *cb,
 	if (mgmt_event == NET_EVENT_L4_DISCONNECTED) {
 		LOG_INF("Network disconnected");
 
-		connected = false;
+		connected = false;  dbg0_net_disconnect_cnt += 1;
 		k_sem_reset(&run_app);
 
 		return;
@@ -327,4 +329,16 @@ void main(void)
 #else
 	exit(start_client());
 #endif
+}
+
+uint32_t dbg0_net_get_conn_cnt(int counter_id)
+{
+    if (counter_id == 1)
+    {
+        return dbg0_net_connect_cnt;
+    }
+    else if (counter_id == 2)
+    {
+        return dbg0_net_disconnect_cnt;
+    }
 }
