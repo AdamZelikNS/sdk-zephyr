@@ -17,6 +17,7 @@ LOG_MODULE_DECLARE(net_echo_client_sample, LOG_LEVEL_DBG);
 #include <net/socket.h>
 #include <net/tls_credentials.h>
 #include <random/rand32.h>
+#include <nrf_802154.h>
 
 #include "common.h"
 #include "ca_certificate.h"
@@ -29,6 +30,8 @@ static inline void dbg0e_net_send(int cntr_id);
 #define UDP_WAIT K_SECONDS(10)
 
 static APP_BMEM char recv_buf[RECV_BUF_SIZE];
+extern volatile uint8_t dbg0_d154_last_tx_fail_reason;
+static uint32_t prv_fail_no_ack_cnt = 0;
 
 static int send_udp_data(struct data *data)
 {
@@ -75,9 +78,16 @@ static void wait_reply(struct k_work *work)
 {
 	/* This means that we did not receive response in time. */
 	struct data *data = CONTAINER_OF(work, struct data, udp.recv);
+    nrf_802154_stat_counters_t d154_stats_now;
+    nrf_802154_stat_counters_get(&d154_stats_now);
 
     dbg0e_net_send(0);
-	LOG_ERR("UDP %s: Data packet not received", data->proto);
+	LOG_ERR("UDP %s: Data packet not received (d154: no_ack_cnt=%u, last_tx_fail=%u)",
+            data->proto,
+            (d154_stats_now.tx_fail_no_ack - prv_fail_no_ack_cnt),
+            (uint32_t)dbg0_d154_last_tx_fail_reason);
+	prv_fail_no_ack_cnt = d154_stats_now.tx_fail_no_ack;
+    dbg0_d154_last_tx_fail_reason = 0;
 
 	/* Send a new packet at this point */
 	send_udp_data(data);

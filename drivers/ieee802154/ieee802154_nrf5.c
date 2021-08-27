@@ -517,6 +517,7 @@ static int nrf5_tx(const struct device *dev,
 	struct nrf5_802154_data *nrf5_radio = NRF5_802154_DATA(dev);
     uint32_t dbg0_nrf5tx_start;
     extern volatile uint64_t dbg0_nrf5tx_time_sum;
+    extern volatile uint8_t dbg0_d154_last_tx_fail_reason;
 	uint8_t payload_len = frag->len;
 	uint8_t *payload = frag->data;
 	bool ret = true;
@@ -585,6 +586,11 @@ static int nrf5_tx(const struct device *dev,
 	 */
 	memcpy(payload, nrf5_radio->tx_psdu + 1, payload_len);
 #endif
+
+    if (nrf5_radio->tx_result != NRF_802154_TX_ERROR_NONE)
+    {
+        dbg0_d154_last_tx_fail_reason = (nrf5_radio->tx_result);
+    }
 
 	switch (nrf5_radio->tx_result) {
 	case NRF_802154_TX_ERROR_NONE:
@@ -1123,3 +1129,4 @@ DEVICE_DEFINE(nrf5_154_radio, CONFIG_IEEE802154_NRF5_DRV_NAME,
 #endif
 
 volatile uint64_t dbg0_nrf5tx_time_sum = 0;
+volatile uint8_t dbg0_d154_last_tx_fail_reason = 0;
