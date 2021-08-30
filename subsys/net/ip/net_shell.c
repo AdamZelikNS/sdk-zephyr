@@ -1307,11 +1307,11 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
        p_req_net_send[7], // subsys/net/ip/net_if: ..
        p_req_net_send[8], // subsys/net/ip/net_if: net_if_l2(iface)->send(iface, pkt);
        p_req_net_send[9]);
-	PR("dbg NET sErr   %u,%u,%u\n",
+	PR("dbg NET sErr   %u,%u,%u,%u\n",
        p_err_net_send[0], // echo-client: udp timeout
        p_err_net_send[1],
        p_err_net_send[2],
-       p_req_net_send[3]);
+       p_err_net_send[3]);
 	PR("d154_rx_time   %llu\t(%llu)\n",
        d154_st.total_listening_time,
        d154_st.total_receive_time);

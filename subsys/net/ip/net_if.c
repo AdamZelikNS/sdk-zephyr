@@ -301,6 +301,12 @@ static bool net_if_tx(struct net_if *iface, struct net_pkt *pkt)
 
 	if (status < 0) {
 		net_pkt_unref(pkt);
+        dbg0e_net_send(3);
+        extern volatile uint8_t dbg0_d154_last_tx_fail_reason;
+        LOG_ERR("net_if_l2->send() returned status = %d"\
+                " (d154:last_tx_fail=%u)",
+                status,
+                dbg0_d154_last_tx_fail_reason);
 	} else {
 		net_stats_update_bytes_sent(iface, status);
 	}
