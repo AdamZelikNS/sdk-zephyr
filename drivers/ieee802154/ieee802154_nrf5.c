@@ -338,7 +338,7 @@ static int nrf5_set_pan_id(const struct device *dev, uint16_t pan_id)
 	sys_put_le16(pan_id, pan_id_le);
 	nrf_802154_pan_id_set(pan_id_le);
 
-	LOG_DBG("0x%x", pan_id);
+	LOG_ERR("IEEE pan id 0x%x", pan_id);
 
 	return 0;
 }
@@ -352,7 +352,7 @@ static int nrf5_set_short_addr(const struct device *dev, uint16_t short_addr)
 	sys_put_le16(short_addr, short_addr_le);
 	nrf_802154_short_address_set(short_addr_le);
 
-	LOG_DBG("0x%x", short_addr);
+	LOG_ERR("IEEE addr short 0x%x", short_addr);
 
 	return 0;
 }
@@ -362,7 +362,7 @@ static int nrf5_set_ieee_addr(const struct device *dev,
 {
 	ARG_UNUSED(dev);
 
-	LOG_DBG("IEEE address %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+	LOG_ERR("IEEE address %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
 		    ieee_addr[7], ieee_addr[6], ieee_addr[5], ieee_addr[4],
 		    ieee_addr[3], ieee_addr[2], ieee_addr[1], ieee_addr[0]);
 
