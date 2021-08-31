@@ -1190,6 +1190,7 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
     uint32_t * const p_req_net_send = (uint32_t *)&(dbg0z_req_net_send[0]);
     uint32_t * const p_err_net_send = (uint32_t *)&(dbg0z_err_net_send[0]);
     extern volatile uint64_t dbg0_nrf5tx_time_sum;
+    extern volatile uint8_t dbg0_show_d154_tx_src_addr;
 
     nrf_802154_stat_counters_t d154_sc;
     nrf_802154_stat_totals_t d154_st;
@@ -1382,6 +1383,7 @@ static void net_shell_print_statistics(struct net_if *iface, void *user_data)
 
     dbg0_nrf5tx_time_sum = 0uLL;
     dbg0_udp_tx_time_sum = 0uLL;
+    dbg0_show_d154_tx_src_addr = 1;
 }
 #endif /* CONFIG_NET_STATISTICS */
 

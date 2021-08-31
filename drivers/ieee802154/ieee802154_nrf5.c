@@ -997,10 +997,11 @@ const uint8_t * nrf_802154_frame_parser_src_addr_get(const uint8_t * p_frame,
 static uint8_t dbg0_prev_src_addr[8] = { 0,0,0,0,0,0,0,0 };
 void dbg0_monitor_tx_src_addr(const uint8_t * frame)
 {
-#if !defined(CONFIG_SOC_NRF5340_CPUAPP)
+    extern volatile uint8_t dbg0_show_d154_tx_src_addr;
 	bool addr_extended;
     const uint8_t * p_src_addr;
-    p_src_addr = nrf_802154_frame_parser_src_addr_get(frame, &addr_extended);
+    p_src_addr = (dbg0_show_d154_tx_src_addr == 0) ? NULL :
+                 nrf_802154_frame_parser_src_addr_get(frame, &addr_extended);
     if ((p_src_addr != NULL) && addr_extended)
     {
         if (memcmp(p_src_addr, &(dbg0_prev_src_addr[0]), 8) != 0)
@@ -1012,7 +1013,6 @@ void dbg0_monitor_tx_src_addr(const uint8_t * frame)
                     p_src_addr[3], p_src_addr[2], p_src_addr[1], p_src_addr[0]);
         }
     }
-#endif
 }
 
 #if defined(CONFIG_NRF_802154_SER_HOST)
@@ -1158,3 +1158,4 @@ DEVICE_DEFINE(nrf5_154_radio, CONFIG_IEEE802154_NRF5_DRV_NAME,
 
 volatile uint64_t dbg0_nrf5tx_time_sum = 0;
 volatile uint8_t dbg0_d154_last_tx_fail_reason = 0;
+volatile uint8_t dbg0_show_d154_tx_src_addr = 0;
