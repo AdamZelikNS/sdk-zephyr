@@ -991,10 +991,34 @@ void nrf_802154_tx_ack_started(const uint8_t *data)
 				data[FRAME_PENDING_BYTE] & FRAME_PENDING_BIT;
 }
 
+const uint8_t * nrf_802154_frame_parser_src_addr_get(const uint8_t * p_frame,
+                                                     bool          * p_src_addr_extended);
+
+static uint8_t dbg0_prev_src_addr[8] = { 0,0,0,0,0,0,0,0 };
+void dbg0_monitor_tx_src_addr(const uint8_t * frame)
+{
+#if !defined(CONFIG_SOC_NRF5340_CPUAPP)
+	bool addr_extended;
+    const uint8_t * p_src_addr;
+    p_src_addr = nrf_802154_frame_parser_src_addr_get(frame, &addr_extended);
+    if ((p_src_addr != NULL) && addr_extended)
+    {
+        if (memcmp(p_src_addr, &(dbg0_prev_src_addr[0]), 8) != 0)
+        {
+            memcpy(&(dbg0_prev_src_addr[0]), p_src_addr, 8);
+            p_src_addr = &(dbg0_prev_src_addr[0]);
+            LOG_ERR("New TX: IEEE address %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+                    p_src_addr[7], p_src_addr[6], p_src_addr[5], p_src_addr[4],
+                    p_src_addr[3], p_src_addr[2], p_src_addr[1], p_src_addr[0]);
+        }
+    }
+#endif
+}
+
 #if defined(CONFIG_NRF_802154_SER_HOST)
 void nrf_802154_transmitted_raw(const uint8_t *frame, uint8_t *ack, int8_t power, uint8_t lqi)
 {
-	ARG_UNUSED(frame);
+	dbg0_monitor_tx_src_addr(frame);
 
 	nrf5_data.tx_result = NRF_802154_TX_ERROR_NONE;
 	nrf5_data.ack_frame.psdu = ack;
@@ -1007,7 +1031,7 @@ void nrf_802154_transmitted_raw(const uint8_t *frame, uint8_t *ack, int8_t power
 void nrf_802154_transmitted_timestamp_raw(const uint8_t *frame, uint8_t *ack, int8_t power,
 					  uint8_t lqi, uint32_t ack_time)
 {
-	ARG_UNUSED(frame);
+	dbg0_monitor_tx_src_addr(frame);
 	ARG_UNUSED(ack_time);
 
 	nrf5_data.tx_result = NRF_802154_TX_ERROR_NONE;
@@ -1027,7 +1051,11 @@ void nrf_802154_transmitted_timestamp_raw(const uint8_t *frame, uint8_t *ack, in
 void nrf_802154_transmit_failed(const uint8_t *frame,
 				nrf_802154_tx_error_t error)
 {
-	ARG_UNUSED(frame);
+	dbg0_monitor_tx_src_addr(frame);
+    for (uint32_t i = 0; i < ARRAY_SIZE(dbg0_prev_src_addr); i++)
+    {
+       dbg0_prev_src_addr[i] = 0;
+    }
 
 	nrf5_data.tx_result = error;
 
