@@ -9,10 +9,12 @@
 #define DT_DRV_COMPAT nordic_nrf_ieee802154
 
 #define LOG_MODULE_NAME ieee802154_nrf5
-#if defined(CONFIG_IEEE802154_DRIVER_LOG_LEVEL)
-#define LOG_LEVEL CONFIG_IEEE802154_DRIVER_LOG_LEVEL
+#if !defined(CONFIG_IEEE802154_DRIVER_LOG_LEVEL)
+#define LOG_LEVEL LOG_LEVEL_WRN
+#elif (CONFIG_IEEE802154_DRIVER_LOG_LEVEL < LOG_LEVEL_WRN)
+#define LOG_LEVEL LOG_LEVEL_WRN
 #else
-#define LOG_LEVEL LOG_LEVEL_NONE
+#define LOG_LEVEL CONFIG_IEEE802154_DRIVER_LOG_LEVEL
 #endif
 
 #include <zephyr/logging/log.h>
@@ -568,6 +570,9 @@ static bool nrf5_tx_at(struct net_pkt *pkt, uint8_t *payload, bool cca)
 	if (nrf5_data.event_handler) {
 		LOG_WRN("TX_STARTED event will be triggered without delay");
 	}
+    if ((tx_at + 5000uLL) < nrf_802154_time_get()) {
+		LOG_WRN("tx_at is very close to now");
+	}
 	return ret;
 }
 #endif /* CONFIG_NET_PKT_TXTIME */
@@ -1100,6 +1105,8 @@ void nrf_802154_transmit_failed(uint8_t *frame,
 				const nrf_802154_transmit_done_metadata_t *metadata)
 {
 	ARG_UNUSED(frame);
+
+    LOG_WRN("%d", ((int)error));
 
 	nrf5_data.tx_result = error;
 	nrf5_data.tx_frame_is_secured = metadata->frame_props.is_secured;
