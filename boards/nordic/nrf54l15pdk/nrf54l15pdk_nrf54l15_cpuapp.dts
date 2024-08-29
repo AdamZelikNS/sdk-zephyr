@@ -16,4 +16,8 @@
 		zephyr,code-partition = &slot0_partition;
 		zephyr,sram = &cpuapp_sram;
 	};
+	prng: prng {
+		compatible = "nordic,entropy-prng";
+		status = "okay";
+	};
 };
