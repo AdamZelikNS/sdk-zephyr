@@ -586,7 +586,11 @@ def process_meta(zephyr_base, west_projs, modules, extra_modules=None,
                 projects[0].posixpath)
             manifest_off = manifest_project.get("remote") is None
             if manifest_off:
-                manifest_project["revision"] +=  "-off"
+                if manifest_project["revision"] is None:
+                    error = f"In {projects[0].posixpath} revision is None"
+                    sys.exit(error)
+                else:
+                    manifest_project["revision"] +=  "-off"
 
         if manifest_project:
             workspace_off |= manifest_off
