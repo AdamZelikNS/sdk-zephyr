@@ -440,6 +440,12 @@ def _create_meta_project(project_path, dbgz_is_manif_pr=False):
                               cwd=path).wait()
         if is_maif_pr:
             print(f"create_meta_pr git_revision {path} is_repo {rc}")
+            retc = subprocess.Popen(['git', '--version'],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    cwd=path).wait()
+            print(f"create_meta_pr git_version returned {retc}")
+
         if rc == 0:
             # A git repo.
             popen = subprocess.Popen(['git', 'rev-parse', 'HEAD'],
