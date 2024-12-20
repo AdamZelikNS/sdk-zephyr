@@ -432,12 +432,14 @@ def process_twister(module, meta):
     return out
 
 
-def _create_meta_project(project_path):
-    def git_revision(path):
+def _create_meta_project(project_path, dbgz_is_manif_pr=False):
+    def git_revision(path, is_maif_pr=False):
         rc = subprocess.Popen(['git', 'rev-parse', '--is-inside-work-tree'],
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,
                               cwd=path).wait()
+        if is_maif_pr:
+            print(f"create_meta_pr git_revision {path} is_repo {rc}")
         if rc == 0:
             # A git repo.
             popen = subprocess.Popen(['git', 'rev-parse', 'HEAD'],
@@ -460,7 +462,7 @@ def _create_meta_project(project_path):
                 return revision, False
         return None, False
 
-    def git_remote(path):
+    def git_remote(path, is_maif_pr=False):
         popen = subprocess.Popen(['git', 'remote'],
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
@@ -471,6 +473,13 @@ def _create_meta_project(project_path):
         remotes_name = []
         if not (popen.returncode or stderr):
             remotes_name = stdout.rstrip().split('\n')
+
+        if is_maif_pr:
+            print(f"create_meta_pr remotes_len {len(remotes_name)}")
+            if len(remotes_name) > 0:
+                print(f"create_meta_pr remotes_list {remotes_name}")
+            else:
+                print(f"create_meta_pr err {stdout} | {stderr} ")
 
         remote_url = None
 
@@ -509,7 +518,7 @@ def _create_meta_project(project_path):
     workspace_dirty = False
     path = PurePath(project_path).as_posix()
 
-    revision, dirty = git_revision(path)
+    revision, dirty = git_revision(path, dbgz_is_manif_pr)
     workspace_dirty |= dirty
     remote = git_remote(path)
     tags = git_tags(path, revision)
@@ -583,7 +592,7 @@ def process_meta(zephyr_base, west_projs, modules, extra_modules=None,
             manifest_off = zephyr_off
         elif not [ prj for prj in projects[1:] if prj.posixpath == manifest_path ]:
             manifest_project, manifest_dirty = _create_meta_project(
-                projects[0].posixpath)
+                projects[0].posixpath, True)
             manifest_off = manifest_project.get("remote") is None
             if manifest_off:
                 if manifest_project["revision"] is None:
