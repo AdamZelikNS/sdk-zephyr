@@ -113,7 +113,7 @@ static inline const struct device *nrf5_get_device(void)
 #endif
 }
 
-static void nrf5_get_eui64(uint8_t *mac)
+static void nrf5_get_eui64(uint8_t *mac, uint8_t skip_ficr_info)
 {
 	uint64_t factoryAddress;
 	uint32_t index = 0;
@@ -133,8 +133,18 @@ static void nrf5_get_eui64(uint8_t *mac)
 #elif defined(CONFIG_TRUSTED_EXECUTION_NONSECURE) && defined(NRF_FICR_S)
 	soc_secure_read_deviceid(deviceid);
 #else
-	deviceid[0] = nrf_ficr_deviceid_get(NRF_FICR, 0);
-	deviceid[1] = nrf_ficr_deviceid_get(NRF_FICR, 1);
+    if (!skip_ficr_info)
+    {
+        /* Use NRF_FICR_Type.INFO.DEVICEADDR at 0x000003A4 (default option) */
+    	deviceid[0] = nrf_ficr_deviceid_get(NRF_FICR, 0);
+    	deviceid[1] = nrf_ficr_deviceid_get(NRF_FICR, 1);
+    }
+    else
+    {
+        /* Use NRF_FICR_Type.DEVICEADDR at 0x00000304 (alt option to check) */
+    	deviceid[0] = (NRF_FICR->DEVICEADDR[0]);
+    	deviceid[1] = (NRF_FICR->DEVICEADDR[1]);
+    }
 #endif
 
 	factoryAddress = (uint64_t)deviceid[EUI64_ADDR_HIGH] << 32;
@@ -794,7 +804,7 @@ static void nrf5_iface_init(struct net_if *iface)
 	const struct device *dev = net_if_get_device(iface);
 	struct nrf5_802154_data *nrf5_radio = NRF5_802154_DATA(dev);
 
-	nrf5_get_eui64(nrf5_radio->mac);
+	nrf5_get_eui64(nrf5_radio->mac, 1);
 	net_if_set_link_addr(iface, nrf5_radio->mac, sizeof(nrf5_radio->mac),
 			     NET_LINK_IEEE802154);
 
@@ -1278,3 +1288,8 @@ DEVICE_DT_INST_DEFINE(0, nrf5_init, NULL, &nrf5_data, &nrf5_radio_cfg,
 		      POST_KERNEL, CONFIG_IEEE802154_NRF5_INIT_PRIO,
 		      &nrf5_radio_api);
 #endif
+
+void debug_get_eui64(uint8_t *p_mac, uint8_t ficr_info_skip)
+{
+    nrf5_get_eui64(p_mac, ficr_info_skip);
+}
